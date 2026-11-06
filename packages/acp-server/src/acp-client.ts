@@ -18,6 +18,8 @@ export interface AcpClient extends IAcpFsClient, IAcpTerminalClient {
   sessionUpdate(params: SessionNotification): Promise<void>;
   requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse>;
   createElicitation(params: CreateElicitationRequest): Promise<CreateElicitationResponse>;
+  extRequest(method: string, params: unknown, signal?: AbortSignal): Promise<unknown>;
+  extNotification(method: string, params: unknown): Promise<void>;
 }
 
 export function acpClientFromContext(client: AgentContext): AcpClient {
@@ -26,6 +28,9 @@ export function acpClientFromContext(client: AgentContext): AcpClient {
     requestPermission: (params) =>
       client.request(methods.client.session.requestPermission, params),
     createElicitation: (params) => client.request(methods.client.elicitation.create, params),
+    extRequest: (method, params, signal) =>
+      client.request(method, params, { cancellationSignal: signal }),
+    extNotification: (method, params) => client.notify(method, params),
     readTextFile: (params) => client.request(methods.client.fs.readTextFile, params),
     writeTextFile: (params) => client.request(methods.client.fs.writeTextFile, params),
     createTerminal: async (params) => {

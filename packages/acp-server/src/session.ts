@@ -61,6 +61,7 @@ import {
   isAuthError,
   stringifyArgs,
 } from './events-map';
+import type { DrgnxPanelSession } from './drgnx-panel';
 import { AcpInteractionBridge } from './interaction-bridge';
 import { log } from './log';
 import { projectModelCatalog } from './model-catalog';
@@ -158,6 +159,8 @@ export class AcpSession {
     private readonly hostCommands:
       | ReadonlyArray<AvailableCommand>
       | HostSlashCommandsSnapshot = [],
+    /** The `_drgnx/panel` side of this session; undefined unless the client asked for the extension. */
+    readonly panel?: DrgnxPanelSession,
   ) {
     this.klient = klient;
     this.session = klient.session(sessionId);
@@ -264,6 +267,7 @@ export class AcpSession {
       });
     }
     this.interactionBridge.dispose();
+    this.panel?.dispose();
     for (const subscription of this.subscriptions.splice(0)) {
       subscription.dispose();
     }
@@ -676,6 +680,7 @@ export class AcpSession {
       if (size === undefined) return;
       const context = await this.agent.getContext();
       this.emit(usageUpdateNotification(this.sessionId, context.tokenCount, size));
+      await this.panel?.pushContext(context.tokenCount, size);
     } catch (error) {
       log.warn('acp: failed to push usage_update', {
         sessionId: this.sessionId,

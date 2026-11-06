@@ -10,7 +10,7 @@ import type {
 } from '@moonshot-ai/agent-core-v2';
 
 import { displayBlockToAcpContent } from './convert';
-import { acpToolCallId } from './events-map';
+import { acpToolCallId, inferToolKind } from './events-map';
 
 export const APPROVE_ONCE_OPTION_ID = 'approve_once';
 export const APPROVE_ALWAYS_OPTION_ID = 'approve_always';
@@ -125,6 +125,7 @@ export function buildPermissionToolCallUpdate(req: ApprovalRequest): ToolCallUpd
   return {
     toolCallId,
     title: req.toolName,
+    kind: inferToolKind(req.toolName),
     content,
   };
 }

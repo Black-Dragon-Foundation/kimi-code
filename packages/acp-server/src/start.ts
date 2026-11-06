@@ -25,6 +25,7 @@ import { createKlient } from '@moonshot-ai/klient/memory';
 import { acpClientFromContext } from './acp-client';
 import { IAcpConnection } from './acp-fs';
 import './acp-terminal';
+import { panelRuntimeFor } from './drgnx-panel';
 import { AcpServer, type AcpServerOptions, createAcpAgentApp } from './server';
 
 export interface RunAcpServerOptions extends AcpServerOptions {
@@ -91,6 +92,7 @@ export async function runAcpServerWithStream(
     terminalAuthEnv: opts.terminalAuthEnv,
     terminalAuthLegacyCommand: opts.terminalAuthLegacyCommand,
     slashCommands: opts.slashCommands,
+    panelRuntime: (sessionId) => panelRuntimeFor(core, sessionId),
     resolveOriginalsDir: (sessionId) => {
       const handle = getLiveSessionById(core.accessor, sessionId);
       return handle === undefined

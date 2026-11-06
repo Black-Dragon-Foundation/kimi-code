@@ -50,6 +50,14 @@ import type { AcpClient } from './acp-client';
 import type { IAcpConnection } from './acp-fs';
 import { buildTerminalAuthMethod, TERMINAL_AUTH_METHOD } from './auth-methods';
 import { acpMcpServersToConfigRecord } from './convert';
+import {
+  DRGNX_COMPACT_PREVIEW_METHOD,
+  DRGNX_PANEL_KEY,
+  DrgnxPanelSession,
+  panelCapability,
+  type CompactPreview,
+  type PanelRuntime,
+} from './drgnx-panel';
 import { log } from './log';
 import { isAcpModeId } from './modes';
 import { AcpSession } from './session';
@@ -85,6 +93,7 @@ export interface AcpServerOptions {
   readonly terminalAuthEnv?: Readonly<Record<string, string>>;
   readonly terminalAuthLegacyCommand?: string;
   readonly resolveOriginalsDir?: (sessionId: string) => string | undefined;
+  readonly panelRuntime?: (sessionId: string) => PanelRuntime | undefined;
   readonly slashCommands?: SlashCommandsResolver;
 }
 
@@ -95,6 +104,8 @@ export class AcpServer {
   private readonly terminalAuthEnv: Readonly<Record<string, string>> | undefined;
   private readonly terminalAuthLegacyCommand: string | undefined;
   private readonly resolveOriginalsDir: ((sessionId: string) => string | undefined) | undefined;
+  private readonly panelRuntime: ((sessionId: string) => PanelRuntime | undefined) | undefined;
+  private panelOffered = false;
   private readonly resolveSlashCommands: (
     session: SessionHandle,
   ) => Promise<ReadonlyArray<AvailableCommand> | SlashCommandsSnapshot>;
@@ -111,6 +122,7 @@ export class AcpServer {
     this.terminalAuthEnv = opts.terminalAuthEnv;
     this.terminalAuthLegacyCommand = opts.terminalAuthLegacyCommand;
     this.resolveOriginalsDir = opts.resolveOriginalsDir;
+    this.panelRuntime = opts.panelRuntime;
     const slashCommands = opts.slashCommands;
     this.resolveSlashCommands =
       typeof slashCommands === 'function'
@@ -150,6 +162,9 @@ export class AcpServer {
       mcpCapabilities: { http: true, sse: true },
       auth: { logout: {} },
     };
+    const panel = this.panelRuntime === undefined ? undefined : panelCapability(params.clientCapabilities);
+    this.panelOffered = panel !== undefined;
+    if (panel !== undefined) agentCapabilities._meta = { [DRGNX_PANEL_KEY]: panel };
 
     return {
       protocolVersion: negotiated.protocolVersion,
@@ -413,6 +428,7 @@ export class AcpServer {
     const session = this.klient.session(sessionId);
     await this.bindDefaultModel(session.agent('main'));
     const hostCommands = await this.resolveSlashCommands(session);
+    const runtime = this.panelOffered ? this.panelRuntime?.(sessionId) : undefined;
     const acpSession = new AcpSession(
       this.conn,
       this.klient,
@@ -421,9 +437,21 @@ export class AcpServer {
       Boolean(this.clientCapabilities?.elicitation?.form),
       this.resolveOriginalsDir,
       hostCommands,
+      runtime === undefined ? undefined : new DrgnxPanelSession(sessionId, this.conn, runtime),
     );
     await acpSession.init();
     return acpSession;
+  }
+
+  async compactPreview(params: { readonly sessionId: string }): Promise<CompactPreview> {
+    const panel = this.sessions.get(params.sessionId)?.panel;
+    if (panel === undefined) {
+      throw RequestError.invalidParams(
+        { sessionId: params.sessionId },
+        `no compact-preview for session: ${params.sessionId}`,
+      );
+    }
+    return panel.compactPreview();
   }
 
   private async activateSession(sessionId: string): Promise<{
@@ -499,6 +527,14 @@ function parseSetSessionModelParams(params: unknown): SetSessionModelParams {
   return { sessionId, modelId };
 }
 
+function parseSessionOnlyParams(params: unknown): { readonly sessionId: string } {
+  const { sessionId } = (params ?? {}) as Record<string, unknown>;
+  if (typeof sessionId !== 'string') {
+    throw RequestError.invalidParams(params, 'expects { sessionId: string }');
+  }
+  return { sessionId };
+}
+
 export function createAcpAgentApp(getServer: () => AcpServer | Promise<AcpServer>): AgentApp {
   return agent({ name: 'kimi-code-acp' })
     .onRequest(methods.agent.initialize, async (ctx) => (await getServer()).initialize(ctx.params))
@@ -527,6 +563,9 @@ export function createAcpAgentApp(getServer: () => AcpServer | Promise<AcpServer
     )
     .onRequest(SET_SESSION_MODEL_METHOD, parseSetSessionModelParams, async (ctx) =>
       (await getServer()).setSessionModel(ctx.params),
+    )
+    .onRequest(DRGNX_COMPACT_PREVIEW_METHOD, parseSessionOnlyParams, async (ctx) =>
+      (await getServer()).compactPreview(ctx.params),
     );
 }
 
