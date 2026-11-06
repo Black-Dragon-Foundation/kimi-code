@@ -20,7 +20,7 @@ import type {
 } from '@moonshot-ai/agent-core-v2';
 
 import { displayBlockToAcpContent } from './convert';
-import { acpToolCallId } from './events-map';
+import { acpToolCallId, inferToolKind } from './events-map';
 
 /**
  * Canonical option ids surfaced to the ACP client.
@@ -219,6 +219,7 @@ export function buildPermissionToolCallUpdate(req: ApprovalRequest): ToolCallUpd
   return {
     toolCallId,
     title: req.toolName,
+    kind: inferToolKind(req.toolName),
     content,
   };
 }
