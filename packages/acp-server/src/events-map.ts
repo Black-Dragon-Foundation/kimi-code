@@ -126,6 +126,7 @@ export function inferToolKind(name: string): ToolKind {
     case 'Terminal':
       return 'execute';
     case 'WebFetch':
+    case 'FetchURL':
     case 'WebSearch':
       return 'fetch';
     case 'Think':

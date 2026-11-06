@@ -48,6 +48,7 @@ import { acpClientFromContext } from './acp-client';
 // connection.
 import { IAcpConnection } from './acp-fs';
 import { AcpEnvironmentProviderFactory } from './acp-terminal';
+import { panelRuntimeFor } from './drgnx-panel';
 import { AcpServer, type AcpServerOptions, createAcpAgentApp } from './server';
 
 export interface RunAcpServerOptions extends AcpServerOptions {
@@ -172,6 +173,7 @@ export async function runAcpServerWithStream(
         .accessor.get(IAgentEnvironmentBindingService)
         .bind(environmentId, context.cwd);
     },
+    panelRuntime: (sessionId) => panelRuntimeFor(core, sessionId),
     unbindSessionEnvironment: async (sessionId) => {
       await acpEnvironmentProvider.unbindSession(sessionId);
     },
